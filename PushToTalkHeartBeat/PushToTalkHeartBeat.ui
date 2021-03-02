@@ -137,7 +137,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Frequency (sec):</string>
+     <string>Interupt (ms):</string>
     </property>
    </widget>
   </widget>

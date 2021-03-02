@@ -1,5 +1,22 @@
 #include "PushToTalkHeartBeat.h"
 
+#include <QSettings>
+#include <QDebug>
+
+PushToTalkHeartBeat::~PushToTalkHeartBeat() {
+  qDebug() << "Saving...";
+  qDebug() << ui.keys_activate->text() << ui.keys_output->text() << last_activate << last_output << ui.time->value() << ui.delay->value();
+  QSettings settings;
+  settings.beginGroup("heartbeat");
+  settings.setValue("last_activate", (int)last_activate);
+  settings.setValue("last_output", (int)last_output);
+  settings.setValue("title_activate", ui.keys_activate->text());
+  settings.setValue("title_output", ui.keys_output->text());
+  settings.setValue("time", (int)ui.time->value());
+  settings.setValue("delay", (int)ui.delay->value());
+  settings.endGroup();
+}
+
 PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -15,11 +32,25 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
 
   Q_ASSERT(res);
 
-  ui.keys_activate->set(0x25,"Left");
-  ui.keys_output->set(0x01);
+  QSettings settings;
+  settings.beginGroup("heartbeat");
+  const auto last_activate = settings.value("last_activate",0x05).toInt();
+  const auto last_output = settings.value("last_output",0x06).toInt();
+  const auto title_activate = settings.value("title_activate","").toString();
+  const auto title_output = settings.value("title_output","").toString();
+  const auto time = settings.value("time",28).toInt();
+  const auto delay = settings.value("delay",200).toInt();
+  settings.endGroup();
 
-  cl.setTime(ui.time->value());
-  cl.setDelay(ui.delay->value());
+  qDebug() << "Loading...";
+  qDebug() << title_activate << title_output << last_activate << last_output << time << delay;
+
+  ui.keys_activate->set(last_activate, title_activate);
+  ui.keys_output->set(last_output, title_output);
+  ui.time->setValue(time);
+  ui.delay->setValue(delay);
+  cl.setTime(time);
+  cl.setDelay(delay);
 }
 
 void PushToTalkHeartBeat::handleActivateChanged(qint32 key) {

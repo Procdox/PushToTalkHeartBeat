@@ -14,6 +14,7 @@ class PushToTalkHeartBeat : public QMainWindow
   qint32 last_output = 0x00;
 
 public:
+  ~PushToTalkHeartBeat();
   PushToTalkHeartBeat(QWidget *parent = Q_NULLPTR);
 
 private:

@@ -3,6 +3,8 @@
 
 int main(int argc, char *argv[])
 {
+    QCoreApplication::setOrganizationName("BlackledgeBuilds");
+    QCoreApplication::setApplicationName("PushToTalkHeartBeat");
     QApplication a(argc, argv);
     PushToTalkHeartBeat w;
     w.show();

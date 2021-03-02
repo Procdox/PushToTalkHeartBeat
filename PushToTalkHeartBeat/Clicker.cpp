@@ -51,8 +51,8 @@ class Clicker::Data {
 
   bool update = true;
   ClickerMode mode = ClickerMode::paused;
-  char activate = VK_LEFT;
-  char output = 0x01;
+  int activate = VK_LEFT;
+  int output = 0x01;
   int delay = 100;
   double max_time = 28;
   
@@ -61,8 +61,8 @@ class Clicker::Data {
     INPUT down = {0};
 
     ClickerMode current_mode;
-    char current_activate;
-    char current_output;
+    int current_activate;
+    int current_output;
     int current_delay;
     double current_max_time;
 
@@ -74,7 +74,7 @@ class Clicker::Data {
       {
         const std::lock_guard<std::mutex> guard(lock);
         if(update) {
-          qDebug() << "Updated";
+          qDebug() << "Updated" << current_max_time << hex << current_activate << current_output;
           if(mode == ClickerMode::dead)
             break;
 
@@ -84,14 +84,23 @@ class Clicker::Data {
           current_delay = delay;
           current_max_time = max_time;
 
-          qDebug() << current_max_time << hex << current_activate << current_output;
-
-          if(current_output == VK_LBUTTON || current_output == VK_RBUTTON) {
+          if(current_output < 0x07) {
             up = mouse_up();
             down = mouse_down();
             if(current_output == VK_RBUTTON) {
               up.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
               down.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+            }
+            else if(current_output == VK_MBUTTON) {
+              up.mi.dwFlags = MOUSEEVENTF_MIDDLEUP;
+              down.mi.dwFlags = MOUSEEVENTF_MIDDLEDOWN;
+            }
+            else if( current_output != VK_LBUTTON ){
+              int x = (current_output == VK_XBUTTON1) ? XBUTTON1: XBUTTON2;
+              up.mi.dwFlags = MOUSEEVENTF_XUP;
+              down.mi.dwFlags = MOUSEEVENTF_XDOWN;
+              up.mi.mouseData = x;
+              down.mi.mouseData = x;
             }
           }
           else {
@@ -137,12 +146,12 @@ public:
     monitor.join(); 
   }
 
-  void setActivate(char key) {
+  void setActivate(int key) {
     const std::lock_guard<std::mutex> guard(lock);
     activate = key;
     update = true;
   }
-  void setOutput(char key) {
+  void setOutput(int key) {
     const std::lock_guard<std::mutex> guard(lock);
     output = key;
     update = true;

@@ -28,7 +28,6 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
   res &= (bool)connect(ui.keys_output, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handleOutputChanged);
   res &= (bool)connect(ui.time, SIGNAL(valueChanged(int)), this, SLOT(handleTimeChanged(int)));
   res &= (bool)connect(ui.delay, SIGNAL(valueChanged(int)), this, SLOT(handleDelayChanged(int)));
-  res &= (bool)connect(ui.enabled, &QPushButton::toggled, this, &PushToTalkHeartBeat::handleEnabled);
 
   Q_ASSERT(res);
 
@@ -53,6 +52,21 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
   cl.setDelay(delay);
 }
 
+bool PushToTalkHeartBeat::event(QEvent *event){
+  if( event->type()==QEvent::Enter ) {
+    qDebug() << "entering";
+    cl.setEnable(false);
+  }
+  else if( event->type()==QEvent::Leave ) {
+    qDebug() << "leaving";
+    if( ui.enabled->isChecked() ) {
+      cl.setEnable(true);
+    }
+  }
+
+  return QMainWindow::event(event);
+}
+
 void PushToTalkHeartBeat::handleActivateChanged(qint32 key) {
   if(key == last_output) {
     ui.enabled->setChecked(false);
@@ -74,7 +88,4 @@ void PushToTalkHeartBeat::handleTimeChanged(int t) {
 }
 void PushToTalkHeartBeat::handleDelayChanged(int t) {
   cl.setDelay(t);
-}
-void PushToTalkHeartBeat::handleEnabled(bool enabled) {
-  cl.setEnable(enabled);
 }

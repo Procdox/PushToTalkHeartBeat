@@ -20,10 +20,11 @@ public:
 private:
   Ui::PushToTalkHeartBeatClass ui;
 
+  bool event(QEvent*);
+
 private slots:
   void handleActivateChanged(qint32);
   void handleOutputChanged(qint32);
   void handleTimeChanged(int);
   void handleDelayChanged(int);
-  void handleEnabled(bool);
 };

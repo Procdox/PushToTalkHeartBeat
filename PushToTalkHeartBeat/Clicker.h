@@ -10,7 +10,6 @@ public:
   ~Clicker();
 
   void setActivate(int);
-  void setOutput(int);
   void setTime(int);
   void setDelay(int);
   void setEnable(bool);

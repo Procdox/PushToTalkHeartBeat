@@ -40,9 +40,9 @@ void NativeKeySequence::set(qint32 v, const QString& s) {
 
 void NativeKeySequence::load(QSettings& settings, qint32 default_value, QString default_text) {
   settings.beginGroup(objectName()+"NKS");
-  last = settings.value("key",default_value).toInt();
-  const auto text = settings.value("text",default_text).toString();
-  set(last, text);
+  const auto _last = settings.value("key",default_value).toInt();
+  const auto _text = settings.value("text",default_text).toString();
+  set(_last, _text);
   settings.endGroup();
 }
 

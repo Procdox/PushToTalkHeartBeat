@@ -19,6 +19,7 @@ private:
   Ui::PushToTalkHeartBeatClass ui;
 
 private slots:
+  void handleModeChanged(int);
   void handlePTTChanged(qint32);
   void handleMuteChanged(qint32);
   void handleTimeChanged(int);

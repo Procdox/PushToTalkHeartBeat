@@ -11,12 +11,6 @@
 #include "winuser.h"
 
 namespace {
-  enum ClickerMode {
-    dead = 0
-  , paused
-  , running
-  };
-
   constexpr INPUT keyboard_up() {
     INPUT result = {0};
     result.type = INPUT_KEYBOARD;
@@ -43,6 +37,55 @@ namespace {
   }
 };
 
+struct Clicker_State {
+  bool running = false;
+  bool mode = false;
+
+  int activate = VK_LEFT;
+  int mute = VK_LEFT;
+
+  int delay = 100;
+  double max_time = 28;
+  int sensitivity = 0;
+
+  bool isActive() const {
+    //Voice
+    if( mode ) {  
+      return false; 
+    }
+
+    // PTT
+    return (GetKeyState(activate) & 0x80) != 0;
+  }
+  void get_keys(INPUT& up, INPUT& down) const {
+    if(mute < 0x07) {
+      up = mouse_up();
+      down = mouse_down();
+      if(mute == VK_RBUTTON) {
+        up.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+        down.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+      }
+      else if(mute == VK_MBUTTON) {
+        up.mi.dwFlags = MOUSEEVENTF_MIDDLEUP;
+        down.mi.dwFlags = MOUSEEVENTF_MIDDLEDOWN;
+      }
+      else if( mute != VK_LBUTTON ){
+        int x = (mute == VK_XBUTTON1) ? XBUTTON1: XBUTTON2;
+        up.mi.dwFlags = MOUSEEVENTF_XUP;
+        down.mi.dwFlags = MOUSEEVENTF_XDOWN;
+        up.mi.mouseData = x;
+        down.mi.mouseData = x;
+      }
+    }
+    else {
+      up = keyboard_up();
+      down = keyboard_down();
+      up.ki.wScan = MapVirtualKey( mute, MAPVK_VK_TO_VSC);
+      down.ki.wScan = MapVirtualKey( mute, MAPVK_VK_TO_VSC);
+    }
+  }
+};
+
 class Clicker::Data {
 
   std::thread monitor;
@@ -50,19 +93,15 @@ class Clicker::Data {
   std::mutex lock;
 
   bool update = true;
-  ClickerMode mode = ClickerMode::paused;
-  int activate = VK_LEFT;
-  int delay = 100;
-  double max_time = 28;
+  bool alive = true;
+
+  Clicker_State internal;
   
   void run() {
     INPUT up = {0};
     INPUT down = {0};
 
-    ClickerMode current_mode;
-    int current_activate;
-    int current_delay;
-    double current_max_time;
+    Clicker_State current;
 
     auto last = std::chrono::high_resolution_clock::now();
 
@@ -72,72 +111,35 @@ class Clicker::Data {
       {
         const std::lock_guard<std::mutex> guard(lock);
         if(update) {
-          if(mode == ClickerMode::dead)
+          if(!alive)
             break;
-
-          current_mode = mode;
-          current_activate = activate;
-          current_delay = delay;
-          current_max_time = max_time;
-
-          qDebug() << "Updated" << current_max_time << current_delay << hex << current_activate;
-
-          if(current_activate < 0x07) {
-            up = mouse_up();
-            down = mouse_down();
-            if(current_activate == VK_RBUTTON) {
-              up.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-              down.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-            }
-            else if(current_activate == VK_MBUTTON) {
-              up.mi.dwFlags = MOUSEEVENTF_MIDDLEUP;
-              down.mi.dwFlags = MOUSEEVENTF_MIDDLEDOWN;
-            }
-            else if( current_activate != VK_LBUTTON ){
-              int x = (current_activate == VK_XBUTTON1) ? XBUTTON1: XBUTTON2;
-              up.mi.dwFlags = MOUSEEVENTF_XUP;
-              down.mi.dwFlags = MOUSEEVENTF_XDOWN;
-              up.mi.mouseData = x;
-              down.mi.mouseData = x;
-            }
-          }
-          else {
-            up = keyboard_up();
-            down = keyboard_down();
-            up.ki.wScan = MapVirtualKey( current_activate,MAPVK_VK_TO_VSC);
-            down.ki.wScan = MapVirtualKey( current_activate,MAPVK_VK_TO_VSC);
-          }
           update = false;
+          current = internal;
+          current.get_keys(up,down);
         }
       }
-      if(current_mode == ClickerMode::paused || (GetKeyState(current_activate) & 0x80) == 0) {
-        last = std::chrono::high_resolution_clock::now();
-        //SendInput(1,&up,sizeof(INPUT));
-
-        if(pressed){
-          qDebug() << "Up";
+      if( current.running ) {
+        if(!current.isActive())
           pressed = false;
-          Sleep(current_delay);
+        else {
+          if(!pressed) {
+            last = std::chrono::high_resolution_clock::now();
+            pressed = true;
+          }
+          else if( std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - last).count() > current.max_time ) {
+            SendInput(1, &down, sizeof(INPUT));
+            Sleep(current.delay);
+            if( current.isActive() ) //did we stop holding the button during the pause
+              SendInput(1, &up, sizeof(INPUT));
+              
+            last = std::chrono::high_resolution_clock::now();
+          }
         }
-      }
-      else {
-        if(!pressed){
-          qDebug() << "Down";
-          pressed = true;
-        }
-        else if( std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - last).count() > current_max_time ){
-          last = std::chrono::high_resolution_clock::now();
-          qDebug() << "Bounce";
-          SendInput(1,&up,sizeof(INPUT));
-          Sleep(current_delay);
-          if( (GetKeyState(current_activate) & 0x80) != 0 )
-            SendInput(1,&down,sizeof(INPUT));
-        }
+  
       }
 
       Sleep(50);
     }
-    qDebug() << "Killed";
   }
   
 
@@ -146,28 +148,48 @@ public:
     monitor = std::move(std::thread(&Data::run,this));
   }
   ~Data() {
-    setMode(ClickerMode::dead);
+    const std::lock_guard<std::mutex> guard(lock);
+    alive = false;
+    update = true;
     monitor.join(); 
+  }
+
+  void setMode(bool m) {
+    const std::lock_guard<std::mutex> guard(lock);
+    internal.mode = m;
+    update = true;
   }
 
   void setActivate(int key) {
     const std::lock_guard<std::mutex> guard(lock);
-    activate = key;
+    internal.activate = key;
     update = true;
   }
+  void setMute(int key) {
+    const std::lock_guard<std::mutex> guard(lock);
+    internal.mute = key;
+    update = true;
+  }
+
   void setTime(double t) {
     const std::lock_guard<std::mutex> guard(lock);
-    max_time = t;
+    internal.max_time = t;
     update = true;
   }
   void setDelay(double t) {
     const std::lock_guard<std::mutex> guard(lock);
-    delay = t;
+    internal.delay = t;
     update = true;
   }
-  void setMode(ClickerMode _mode) {
+  void setSensitivity(double t) {
     const std::lock_guard<std::mutex> guard(lock);
-    mode = _mode;
+    internal.sensitivity = t;
+    update = true;
+  }
+
+  void setEnabled(bool enabled) {
+    const std::lock_guard<std::mutex> guard(lock);
+    internal.running = enabled;
     update = true;
   }
 };
@@ -182,15 +204,28 @@ Clicker::Clicker()
 Clicker::~Clicker() {
 }
 
-void Clicker::setActivate(int key) {
-  d().setActivate(key);
+
+void Clicker::setMode(bool mode) {
+  d().setMode(mode);
 }
-void Clicker::setTime(int t) {
-  d().setTime(t);
+void Clicker::setActivate(int ptt) {
+  d().setActivate(ptt);
 }
-void Clicker::setDelay(int t) {
-  d().setDelay(t);
+void Clicker::setMute(int mute) {
+  d().setMute(mute);
 }
+
+void Clicker::setTime(int time) {
+  d().setTime(time);
+}
+void Clicker::setDelay(int delay) {
+  d().setDelay(delay);
+}
+void Clicker::setSensitivity(int sensitivity) {
+  d().setSensitivity(sensitivity);
+}
+
+
 void Clicker::setEnable(bool enabled) {
-  d().setMode(enabled ? ClickerMode::running : ClickerMode::paused);
+  d().setEnabled(enabled);
 }

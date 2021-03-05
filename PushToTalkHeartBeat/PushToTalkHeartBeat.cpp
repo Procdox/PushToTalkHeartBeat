@@ -33,6 +33,8 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
   setWindowFlag(Qt::MSWindowsFixedSizeDialogHint, true);
 
   bool res = true;
+  res &= (bool)connect(ui.tabs, &QTabWidget::currentChanged, this, &PushToTalkHeartBeat::handleModeChanged);
+
   res &= (bool)connect(ui.keys_activate, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handlePTTChanged);
   res &= (bool)connect(ui.keys_mute, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handleMuteChanged);
 
@@ -56,13 +58,15 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
   ui.tabs->setCurrentIndex(settings.value("mode", 0).toInt());
 }
 
+void PushToTalkHeartBeat::handleModeChanged(int mode) {
+  cl.setMode(mode);
+}
 void PushToTalkHeartBeat::handlePTTChanged(qint32 ptt) {
   cl.setActivate(ptt);
 }
 void PushToTalkHeartBeat::handleMuteChanged(qint32 mute) {
-  
+  cl.setMute(mute);
 }
-
 void PushToTalkHeartBeat::handleTimeChanged(int time) {
   cl.setTime(time);
 }
@@ -70,9 +74,8 @@ void PushToTalkHeartBeat::handleDelayChanged(int delay) {
   cl.setDelay(delay);
 }
 void PushToTalkHeartBeat::handleSensitivityChanged(int sensitivity) {
-
+  cl.setSensitivity(sensitivity);
 }
-
 void PushToTalkHeartBeat::handleEnabledChanged(bool enabled) {
   cl.setEnable(enabled);
 }

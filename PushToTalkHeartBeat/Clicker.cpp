@@ -20,13 +20,13 @@ namespace {
   constexpr INPUT keyboard_up() {
     INPUT result = {0};
     result.type = INPUT_KEYBOARD;
-    result.ki.dwFlags = KEYEVENTF_KEYUP;
+    result.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
     return result;
   }
   constexpr INPUT keyboard_down() {
     INPUT result = {0};
     result.type = INPUT_KEYBOARD;
-    result.ki.dwFlags = 0;
+    result.ki.dwFlags = KEYEVENTF_SCANCODE;
     return result;
   }
   constexpr INPUT mouse_up() {
@@ -104,8 +104,8 @@ class Clicker::Data {
           else {
             up = keyboard_up();
             down = keyboard_down();
-            up.ki.wVk = current_activate;
-            down.ki.wVk = current_activate;
+            up.ki.wScan = MapVirtualKey( current_activate,MAPVK_VK_TO_VSC);
+            down.ki.wScan = MapVirtualKey( current_activate,MAPVK_VK_TO_VSC);
           }
           update = false;
         }
@@ -130,7 +130,8 @@ class Clicker::Data {
           qDebug() << "Bounce";
           SendInput(1,&up,sizeof(INPUT));
           Sleep(current_delay);
-          SendInput(1,&down,sizeof(INPUT));
+          if( (GetKeyState(current_activate) & 0x80) != 0 )
+            SendInput(1,&down,sizeof(INPUT));
         }
       }
 

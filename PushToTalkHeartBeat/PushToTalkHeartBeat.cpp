@@ -3,16 +3,27 @@
 #include <QSettings>
 #include <QDebug>
 
+template<typename t>
+void load_input(t* input, QSettings& settings, int default_value) {
+  input->setValue(settings.value(input->objectName(),default_value).toInt());
+}
+
+template<typename t>
+void save_input(t* input, QSettings& settings) {
+  settings.setValue(input->objectName(), (int)input->value());
+}
+
 PushToTalkHeartBeat::~PushToTalkHeartBeat() {
-  qDebug() << "Saving...";
-  qDebug() << ui.keys_activate->text() << last_activate << ui.time->value() << ui.delay->value();
   QSettings settings;
   settings.beginGroup("heartbeat");
-  settings.setValue("last_activate", (int)last_activate);
-  settings.setValue("title_activate", ui.keys_activate->text());
-  settings.setValue("time", (int)ui.time->value());
-  settings.setValue("delay", (int)ui.delay->value());
-  settings.endGroup();
+  ui.keys_activate->save(settings);
+  ui.keys_mute->save(settings);
+
+  save_input(ui.time, settings);
+  save_input(ui.delay, settings);
+  save_input(ui.sensitivity, settings);
+
+  settings.setValue("mode", ui.tabs->currentIndex());
 }
 
 PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
@@ -22,52 +33,46 @@ PushToTalkHeartBeat::PushToTalkHeartBeat(QWidget *parent)
   setWindowFlag(Qt::MSWindowsFixedSizeDialogHint, true);
 
   bool res = true;
-  res &= (bool)connect(ui.keys_activate, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handleActivateChanged);
+  res &= (bool)connect(ui.keys_activate, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handlePTTChanged);
+  res &= (bool)connect(ui.keys_mute, &NativeKeySequence::nativeReady, this, &PushToTalkHeartBeat::handleMuteChanged);
+
   res &= (bool)connect(ui.time, SIGNAL(valueChanged(int)), this, SLOT(handleTimeChanged(int)));
   res &= (bool)connect(ui.delay, SIGNAL(valueChanged(int)), this, SLOT(handleDelayChanged(int)));
+  res &= (bool)connect(ui.sensitivity, SIGNAL(valueChanged(int)), this, SLOT(handleSensitivityChanged(int)));
+
+  res &= (bool)connect(ui.enabled, SIGNAL(toggled(bool)), this, SLOT(handleEnabledChanged(bool)));
 
   Q_ASSERT(res);
 
   QSettings settings;
   settings.beginGroup("heartbeat");
-  const auto last_activate = settings.value("last_activate",0x05).toInt();
-  const auto title_activate = settings.value("title_activate","").toString();
-  const auto time = settings.value("time",28).toInt();
-  const auto delay = settings.value("delay",250).toInt();
-  settings.endGroup();
+  ui.keys_activate->load(settings,0x05,"");
+  ui.keys_mute->load(settings,0x25,"Left");
 
-  qDebug() << "Loading...";
-  qDebug() << title_activate << last_activate << time << delay;
+  load_input(ui.time,settings,28);
+  load_input(ui.delay,settings,250);
+  load_input(ui.sensitivity,settings,0);
 
-  ui.keys_activate->set(last_activate, title_activate);
-  ui.time->setValue(time);
-  ui.delay->setValue(delay);
+  ui.tabs->setCurrentIndex(settings.value("mode", 0).toInt());
+}
+
+void PushToTalkHeartBeat::handlePTTChanged(qint32 ptt) {
+  cl.setActivate(ptt);
+}
+void PushToTalkHeartBeat::handleMuteChanged(qint32 mute) {
+  
+}
+
+void PushToTalkHeartBeat::handleTimeChanged(int time) {
   cl.setTime(time);
+}
+void PushToTalkHeartBeat::handleDelayChanged(int delay) {
   cl.setDelay(delay);
 }
+void PushToTalkHeartBeat::handleSensitivityChanged(int sensitivity) {
 
-bool PushToTalkHeartBeat::event(QEvent *event){
-  if( event->type()==QEvent::Enter ) {
-    qDebug() << "entering";
-    cl.setEnable(false);
-  }
-  else if( event->type()==QEvent::Leave ) {
-    qDebug() << "leaving";
-    if( ui.enabled->isChecked() ) {
-      cl.setEnable(true);
-    }
-  }
-
-  return QMainWindow::event(event);
 }
 
-void PushToTalkHeartBeat::handleActivateChanged(qint32 key) {
-  cl.setActivate(key);
-  last_activate = key;
-}
-void PushToTalkHeartBeat::handleTimeChanged(int t) {
-  cl.setTime(t);
-}
-void PushToTalkHeartBeat::handleDelayChanged(int t) {
-  cl.setDelay(t);
+void PushToTalkHeartBeat::handleEnabledChanged(bool enabled) {
+  cl.setEnable(enabled);
 }

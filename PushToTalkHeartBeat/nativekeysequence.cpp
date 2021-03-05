@@ -38,6 +38,21 @@ void NativeKeySequence::set(qint32 v, const QString& s) {
   emit nativeReady(last);
 }
 
+void NativeKeySequence::load(QSettings& settings, qint32 default_value, QString default_text) {
+  settings.beginGroup(objectName()+"NKS");
+  last = settings.value("key",default_value).toInt();
+  const auto text = settings.value("text",default_text).toString();
+  set(last, text);
+  settings.endGroup();
+}
+
+void NativeKeySequence::save(QSettings& settings) {
+  settings.beginGroup(objectName()+"NKS");
+  settings.setValue("key", (int)last);
+  settings.setValue("text", text());
+  settings.endGroup();
+}
+
 bool NativeKeySequence::event(QEvent *event) {
   
   if(event->type() == QEvent::KeyPress) {
